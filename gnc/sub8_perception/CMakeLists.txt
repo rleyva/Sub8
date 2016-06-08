@@ -23,6 +23,7 @@ find_package(catkin
 catkin_python_setup()
 
 find_package(PCL 1.7 REQUIRED)
+find_package(OpenCV 2.4.13 REQUIRED)
 
 catkin_package(
   INCLUDE_DIRS
@@ -132,6 +133,23 @@ target_link_libraries(
     ${OpenCV_INCLUDE_DIRS}
     bfd
     dl
+)
+
+add_executable(
+        feature_detect_cpp
+        nodes/feature_detection.cpp
+)
+
+add_dependencies(
+        feature_detect_cpp
+        ${catkin_EXPORTED_TARGETS}
+)
+
+target_link_libraries(
+        feature_detect_cpp
+        ${OpenCV_LIBRARIES} opencv_nonfree
+	${catkin_LIBRARIES}
+        ${Boost_LIBRARIES}
 )
 
 install(
