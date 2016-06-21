@@ -21,6 +21,8 @@ class Gate:
         self.yellow_min = np.array([0, 50, 50], np.uint8)
         self.yellow_max = np.array([29, 250, 250], np.uint8)
 
+        self.dims = (2.4, 1.2)  # dimensions in metes (w,l)
+
         # Orientation information
         self.point_publisher = rospy.Publisher("gate_points", PointStamped, queue_size=4)
         self.gate_pose = None
@@ -69,12 +71,37 @@ class GateFinder:
         else:
             pass
 
-    def ncc(self, image, scale=15):
-        kernel = np.ones((scale, scale)) * -1
-        midpoint = (scale // 2, scale // 2)
-        cv2.circle(kernel, midpoint, midpoint[0], 1, -1)
+    def gen_gate_kernel(self, scale=15):
+        if scale <= 3:
+            vert_kern = np.ones((3,3))*-5
+            horz_kern = np.ones((3,3))*-5
+            midpoint = (1,1)
+        else:
+            vert_kern = np.ones((scale, scale))*-1
+            horz_kern = np.ones((scale, scale))*-1
+            midpoint = (scale // 2, scale // 2)
+
+        cv2.rectangle(vert_kern, (midpoint[0]-1, 0), (midpoint[0]+1, scale-1), 1, -1)
+        cv2.rectangle(horz_kern, (0, midpoint[1]-1), (scale-1, midpoint[1]+1), 1, -1)
+        return vert_kern, horz_kern
+
+    def ncc(self, image, scale=10):
+        # kernel = np.ones((scale, scale)) * -1
+        # midpoint = (scale // 2, scale // 2)
+        # cv2.circle(kernel, midpoint, midpoint[0], 1, -1)
+        img = None
+        v, h = self.gen_gate_kernel()
         mean, std_dev = cv2.meanStdDev(image)
-        return cv2.filter2D((image - mean) / std_dev, -1, kernel)
+        
+        #return cv2.filter2D((image - mean) / std_dev, -1, kernel)
+        v_f = cv2.filter2D((image-mean) / std_dev, -1, v)
+        h_f = cv2.filter2D((image-mean) / std_dev, -1, h)
+
+        #img = cv2.bitwise_and(v_f, h_f)
+        #cv2.imshow('B_masked', img)
+        #cv2.waitKey(0)
+        #return v_f
+        return cv2.bitwise_and(v_f, h_f)
 
     def find_contours(self, image, cam):
         # TODO: Resize image to process faster
@@ -129,7 +156,7 @@ class GateFinder:
 
             # Camera Shenanigans
             if cam == 'l':
-       i         self.lP = np.asarray(self.lcam_info.P).reshape((3, 4))
+                self.lP = np.asarray(self.lcam_info.P).reshape((3, 4))
                 P = self.lP
                 return plane_pts
             elif cam == 'r':
@@ -231,6 +258,7 @@ if __name__ =='__main__':
     rospy.init_node('gate_finder', anonymous=False)
     sg = Gate()
     gf = GateFinder(sg)
+    gf.gen_gate_kernel()
 
     try:
         rospy.spin()
