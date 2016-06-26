@@ -25,7 +25,7 @@ class RvizVisualizer(object):
         # TODO: Clean this up, there should be a way to set all of this inline
         self.surface_marker = visualization_msgs.Marker()
         self.surface_marker.type = self.surface_marker.TEXT_VIEW_FACING
-        self.surface_marker.color = ColorRGBA(1, 1, 1, 1) 
+        self.surface_marker.color = ColorRGBA(1.0, 1.0, 1.0, 1.0)
         self.surface_marker.scale.z = 0.1
 
         self.depth_marker = visualization_msgs.Marker()
@@ -55,8 +55,8 @@ class RvizVisualizer(object):
         self.surface_marker.text = str(round(distance, 3)) + 'm'
         self.surface_marker.id = 0
 
+        self.rviz_pub_t.publish(self.depth_marker)
         self.rviz_pub.publish(marker)
-        self.depth_marker.publish(self.depth_marker)
 
     def range_callback(self, msg):
         '''Handle range data grabbed from dvl'''
