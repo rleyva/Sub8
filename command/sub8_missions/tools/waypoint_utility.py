@@ -67,7 +67,6 @@ class Spacenav(object):
 
     def odom_cb(self, msg):
         '''HACK: Intermediate hack until we have tf set up'''
-        self.odom_ = msg
         pose, twist, _, _ = sub8_utils.odometry_to_numpy(msg)
         position, orientation = pose
         self.world_to_body = self.transformer.fromTranslationRotation(position, orientation)[:3, :3]
@@ -108,9 +107,6 @@ class Spacenav(object):
         self.publish_target_pose(self.target_position, self.target_orientation_quaternion)
 
     def publish_target_pose(self, position, orientation):
-        #pose_ = pose_editor.PoseEditor.from_Odometry(self.odom_)
-        #print "Pre-zero'ed pose: ", pose_.zero_roll_and_pitch()
-
         self.target_pose_pub.publish(
             PoseStamped(
                 header=sub8_utils.make_header('/map'),
