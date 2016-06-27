@@ -6,6 +6,7 @@ import sub8_ros_tools as sub8_utils
 import tf
 import numpy as np
 
+from sub8 import pose_editor
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Twist, Pose, PoseStamped
 from sensor_msgs.msg import Joy
@@ -56,16 +57,17 @@ class Spacenav(object):
         self.target_orientation_quaternion = np.array([0.0, 0.0, 0.0, 1.0])
 
         self.client = actionlib.SimpleActionClient('/moveto', uf_common_msgs.MoveToAction)
-        # self.client.wait_for_server()
 
         self.target_pose_pub = rospy.Publisher('/posegoal', PoseStamped, queue_size=1)
         self.target_distance_pub = rospy.Publisher('/pose_distance', Marker, queue_size=1)
+
         self.odom_sub = rospy.Subscriber('/odom', nav_msgs.Odometry, self.odom_cb, queue_size=1)
         self.twist_sub = rospy.Subscriber('/spacenav/twist', Twist, self.twist_cb, queue_size=1)
         self.joy_sub = rospy.Subscriber('/spacenav/joy', Joy, self.joy_cb, queue_size=1)
 
     def odom_cb(self, msg):
         '''HACK: Intermediate hack until we have tf set up'''
+        self.odom_ = msg
         pose, twist, _, _ = sub8_utils.odometry_to_numpy(msg)
         position, orientation = pose
         self.world_to_body = self.transformer.fromTranslationRotation(position, orientation)[:3, :3]
@@ -95,9 +97,9 @@ class Spacenav(object):
         # self.target_orientation = self.cur_orientation
         # self.target_orientation = rotation.dot(self.target_orientation)
 
-        self.target_orientation = self.target_orientation.dot(rotation)
         self.target_distance = round(np.linalg.norm(np.array([self.diff_position[0], self.diff_position[1]])), 3)
         self.target_depth = round(self.diff_position[2], 3)
+
         self.target_orientation = self.target_orientation.dot(rotation)
 
         blank = np.eye(4)
@@ -106,6 +108,9 @@ class Spacenav(object):
         self.publish_target_pose(self.target_position, self.target_orientation_quaternion)
 
     def publish_target_pose(self, position, orientation):
+        #pose_ = pose_editor.PoseEditor.from_Odometry(self.odom_)
+        #print "Pre-zero'ed pose: ", pose_.zero_roll_and_pitch()
+
         self.target_pose_pub.publish(
             PoseStamped(
                 header=sub8_utils.make_header('/map'),
@@ -141,20 +146,24 @@ class Spacenav(object):
         rospy.logwarn("Going to waypoint")
         rospy.logwarn("Found server")
 
+        # TODO: Avoid making a new pose message
+        pose = geom_msgs.Pose(
+            position=sub8_utils.numpy_to_point(position),
+            orientation=sub8_utils.numpy_to_quaternion(orientation)
+        )
+        pose_ = pose_editor.PoseEditor.from_Pose('/map', pose).zero_roll_and_pitch().as_Pose()
+
         goal = uf_common_msgs.MoveToGoal(
             header=sub8_utils.make_header('/map'),
             posetwist=uf_common_msgs.PoseTwist(
-                pose=geom_msgs.Pose(
-                    position=sub8_utils.numpy_to_point(position),
-                    orientation=sub8_utils.numpy_to_quaternion(orientation)
-                )
+                pose=pose_
             ),
             speed=0.2,
             linear_tolerance=0.1,
             angular_tolerance=0.1
         )
+
         self.client.send_goal(goal)
-        # self.client.wait_for_result()
         rospy.logwarn("Got to waypoint")
 
 

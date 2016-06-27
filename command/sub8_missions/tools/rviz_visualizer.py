@@ -16,6 +16,7 @@ class RvizVisualizer(object):
     '''Cute tool for drawing both depth and height-from-bottom in RVIZ
     '''
 
+    # TODO: Force new waypoints to have 0 roll and pitch 
     def __init__(self):
         rospy.init_node('revisualizer')
         self.rviz_pub = rospy.Publisher("visualization/state", visualization_msgs.Marker, queue_size=2)
