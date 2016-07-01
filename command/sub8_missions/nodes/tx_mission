@@ -26,6 +26,9 @@ def main():
         parser.add_argument('--test', dest='test', action='store_true',
                             help="Set this flag if you'd like to ignore motions")
 
+        parser.add_argument('--timeout', dest='timeout',
+                           help="Set timeout for mission in seconds")
+
         nh, args = nh_args
         args = parser.parse_args(args[1:])
 
@@ -55,8 +58,9 @@ def main():
 
         print 'Mission runner got pose'
         for mission in mission_list:
-            yield mission.run(sub).addErrback(catch_error)
-            yield txros.util.wall_sleep(1.0)  # Seems to make things behave more nicely
+            #yield mission.run(sub).addErrback(catch_error)
+            #yield txros.util.wall_sleep(1.0)  # Seems to make things behave more nicely
+            yield txros.util.wrap_timeout(mission.run(sub), int(args.timeout)).addErrback(catch_error)
 
     except Exception:
         traceback.print_exc()

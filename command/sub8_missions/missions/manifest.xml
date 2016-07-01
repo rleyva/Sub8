@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<data>
+    <mission name="down_2m">
+        <rank>1</rank>
+	<eta>15</eta>
+        <timeout>20</timeout>
+        <points>100</points>
+    </mission>
+    <mission name="up_2m">
+        <rank>2</rank>
+	<eta>15</eta>
+        <timeout>10</timeout>
+        <points>59900</points>
+    </mission>
+</data>
