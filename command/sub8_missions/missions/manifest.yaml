@@ -1,0 +1,15 @@
+- mission:
+    name: down_2m
+    rank: 1
+    eta: 10
+    timeout: 20
+    points: 1
+    args: false
+    
+- mission:
+    name: up_2m 
+    rank: 2
+    eta: 10 
+    timeout: 20
+    points: 1
+    args: false
