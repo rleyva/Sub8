@@ -7,35 +7,58 @@ import exceptions
 import txros
 from sub8 import tx_sub
 import missions.mission_library as mission_library
-import xml.etree.ElementTree as ET
+import yaml
 
+# Parse 
 class Sub8Missionlet():
-    # Only for organization
-    def __init__(self, name, rank, eta, timeout, points):
-        self.name = name
-        self.rank = rank
-        self.eta = eta
-        self.timeout = timeout
-        self.points = points
+    def __init__(self, d):
+        # Fields provided by the dictionary are: 
+        # name, eta, timeout, rank, points, args 
+        self.__dict__ = d
         self.functor = None
 
     def __str__(self):
-        return 'Mission: ' + self.name + '\n'\
-                '   Rank: ' + self.rank + '\n'\
-                '   ETA: ' + self.eta + '\n'\
-                '   Timeout: ' + self.timeout + '\n'\
-                '   Points: ' + self.points
+        return  'Mission: ' + self.name + '\n'\
+                '   Rank: ' + str(self.rank) + '\n'\
+                '   ETA: ' + str(self.eta) + ' secs\n'\
+                '   Timeout: ' + str(self.timeout) + ' secs\n'\
+                '   Points: ' + str(self.points)
 
-def parse_mission(path):
-    parsed_m = []
-    tree = ET.parse(path)
-    tr_ = tree.getroot()
+class Sub8MissionManager():
+    def __init__(self, manifest_path, mission_list):
+        # TODO: parse all missions in the missions directory & manifest yaml
+        # Append missionlets to mission list
+        # Run mission checks
+        self.manifest_path = manifest_path
+        self.mission_list = mission_list
 
-    for i, s_mission in enumerate(tr_.iter('mission')):
-        parsed_m.append(Sub8Missionlet(s_mission.attrib['name'], tr_[i][0].text,\
-                        tr_[i][1].text, tr_[i][2].text, tr_[i][3].text)
-                       )
-    return parsed_m
+    def __str__(self):
+        # Function should return mission manifest, along
+        # with estimates timings for each 
+        pass
+
+    def assemble_mission(self):
+        # TODO: Add roll & pitch corrections along with other things to 
+        # make missions smoother.
+        pass
+
+    def handle_ex(self, exception):
+        # TODO: Handle executions 
+        pass
+
+    def pause(self):
+        # Future functionality 
+        pass
+
+    def run(self):
+        # 
+        pass
+
+def parse_mission(manifest_pth):
+    stream = open(manifest_pth, 'r')
+    manifest = yaml.safe_load(stream)
+    stream.close()
+    return [Sub8Missionlet(mission['mission']) for mission in manifest]
 
 @txros.util.cancellableInlineCallbacks
 def main():
@@ -45,13 +68,16 @@ def main():
 
         todo_list = []
         mission_avail = []
-        manifest_pth = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/manifest.xml'
+        manifest_pth = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/manifest.yaml'
         mission_pth = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/mission_library/'
         mlist_ = parse_mission(manifest_pth)
 
         for mission in os.listdir(mission_pth):
             if not mission.startswith('_') and not mission.endswith('pyc',3):
                 mission_avail.append(mission.split(".")[0])
+
+        print 'Available Missions: ' + '\n'
+        print mission_avail 
 
         for mission in mlist_:
             if mission.name in mission_avail:
@@ -76,8 +102,8 @@ def main():
 
         yield txros.util.wall_sleep(1.0)
 
-    except Exception:
-        print traceback.print_exec()
+    #except Exception:
+    #    print traceback.print_exec()
 
     finally:
         print 'Finished Execution'
