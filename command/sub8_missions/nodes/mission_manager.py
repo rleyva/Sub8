@@ -1,21 +1,29 @@
 #!/usr/bin/env python 
 import os
+import yaml
+import copy
 import signal
+import pprint
 import traceback
-from twisted.internet import defer, reactor
 import exceptions
+from operator import itemgetter
+from twisted.internet import defer, reactor
+
+import rospy
 import txros
 from sub8 import tx_sub
 import missions.mission_library as mission_library
-import yaml
 
-# Parse 
+# TODO: Should be handled as arguments which are provided via launch
+manifest_path = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/manifest.yaml'
+mission_path = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/mission_library/'
+
 class Sub8Missionlet():
-    def __init__(self, d):
+    def __init__(self, d, functor=None):
         # Fields provided by the dictionary are: 
         # name, eta, timeout, rank, points, args 
         self.__dict__ = d
-        self.functor = None
+        self.functor = functor
 
     def __str__(self):
         return  'Mission: ' + self.name + '\n'\
@@ -24,95 +32,128 @@ class Sub8Missionlet():
                 '   Timeout: ' + str(self.timeout) + ' secs\n'\
                 '   Points: ' + str(self.points)
 
+
 class Sub8MissionManager():
-    def __init__(self, manifest_path, mission_list):
-        # TODO: parse all missions in the missions directory & manifest yaml
-        # Append missionlets to mission list
-        # Run mission checks
+    # TODO: Init stage should handle fetching sub_singleton
+    # We should be able to change parameters set in that sub object from a Sub8MissionManager instance
+    def __init__(self):
+        #self.start_time = rospy.get_rostime()
+        #rospy.loginfo("Sub8 Mission Manager started at %i %i", self.start_time.secs, self.start_time.nsecs)
+
         self.manifest_path = manifest_path
-        self.mission_list = mission_list
+        missionlet_queue = self.parse_manifest()
+        self.mission_list = self.assemble_mission(missionlet_queue)
 
     def __str__(self):
         # Function should return mission manifest, along
         # with estimates timings for each 
-        pass
+       return 'I am a mission manager'
 
-    def assemble_mission(self):
-        # TODO: Add roll & pitch corrections along with other things to 
-        # make missions smoother.
-        pass
+    def parse_manifest(self):
+        # Get list of available missions
+        missionlet_library = []
+        missionlet_queue = []
 
-    def handle_ex(self, exception):
+        stream = open(manifest_path, 'r')
+        manifest = yaml.safe_load(stream)
+        stream.close()
+
+        desired_missionalets = [Sub8Missionlet(mission['mission']) for mission in manifest]
+
+        for missionlet in os.listdir(mission_path):
+            if not missionlet.startswith('_') and not missionlet.endswith('pyc', 3):
+                missionlet_library.append(missionlet.split(".")[0])
+
+        for missionlet in desired_missionalets:
+            if missionlet.name in missionlet_library:
+                try:
+                    missionlet.functor = getattr(mission_library, missionlet.name)
+                    missionlet_queue.append(missionlet)
+                except AttributeError:
+                    traceback.print_exc()
+            else:
+                # TODO: Remove this, it should be handled as ROS log error
+                print "'{}' is not an available mission".format(mission)
+
+        return missionlet_queue
+
+    def assemble_mission(self, missionlet_list, key='rank'):
+        # Missions will have a timeout period, and will fix roll and pitch after each mission
+        # EX: level_off -> mission_1 -> timeout + level_off -> mission_2 ...
+        try:
+            level_off = Sub8Missionlet({
+                'name'   : 'level_off',
+                'rank'   : '0',
+                'eta'    : '30',
+                'timeout': '30',
+                'points' : '0'
+            },
+            getattr(mission_library, 'level_off')
+            )
+        except AttributeError:
+            print 'assemble_mission: Level mission was not found'
+            return missionlet_list
+
+        #missionlet_queue = self._sort(missionlet_list, key)
+
+        assembled_mission = []
+        assembled_mission.append(level_off)
+
+        for missionlet in missionlet_list:
+            assembled_mission.extend([missionlet, copy.deepcopy(level_off)])
+
+        for i in assembled_mission:
+            print i.name + ' functor addr: ', i.functor.run
+
+        return assembled_mission
+
+    def _handle_ex(self, exception):
         # TODO: Handle executions 
         pass
 
-    def pause(self):
-        # Future functionality 
+    def _pause(self):
+        # Future functionality; will pause defered
         pass
 
-    def run(self):
-        # 
-        pass
-
-def parse_mission(manifest_pth):
-    stream = open(manifest_pth, 'r')
-    manifest = yaml.safe_load(stream)
-    stream.close()
-    return [Sub8Missionlet(mission['mission']) for mission in manifest]
-
-@txros.util.cancellableInlineCallbacks
-def main():
-    try:
-        # TODO: Handle this in ROS launch  
-        nh_args = yield txros.NodeHandle.from_argv_with_remaining('sub8_mission')
-
-        todo_list = []
-        mission_avail = []
-        manifest_pth = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/manifest.yaml'
-        mission_pth = os.path.abspath(os.path.join(__file__, "../..")) + '/missions/mission_library/'
-        mlist_ = parse_mission(manifest_pth)
-
-        for mission in os.listdir(mission_pth):
-            if not mission.startswith('_') and not mission.endswith('pyc',3):
-                mission_avail.append(mission.split(".")[0])
-
-        print 'Available Missions: ' + '\n'
-        print mission_avail 
-
-        for mission in mlist_:
-            if mission.name in mission_avail:
-                try:
-                    mission.functor = getattr(mission_library, mission.name)
-                    todo_list.append(mission)
-                except AttributeError:
-                     traceback.print_exc()
+    def _sort(self, missionlet_list, key):
+        # Arrange missions by key. i.e. rank, eta, points
+        try:
+            if key is 'custom':
+                return mission_list
             else:
-                print "'{}' is not an available mission".format(mission)
+                return sorted(missionlet_list, key=itemgetter(str(key)))
+        except AttributeError:
+            print '_sort : Not valid attribute'
+            return missionlet_list
 
-        # Now we're ready for fun!
+    def _start(self):
+        signal.signal(signal.SIGINT, lambda signum, frame: reactor.callFromThread(task.cancel))
+        task = main(self).addErrback(lambda fail: fail.trap(defer.CancelledError))
+
+    @txros.util.cancellableInlineCallbacks
+    def run(self):
+        nh_args = yield txros.NodeHandle.from_argv_with_remaining('sub8_mission')
         nh, args = nh_args
         sub = yield tx_sub.get_sub(nh)
         yield txros.util.wall_sleep(1.0)
-
         yield sub.last_pose()
 
-        for i in range(3):
-            for chore in todo_list:
-                yield txros.util.wrap_timeout(chore.functor.run(sub), int(chore.timeout))
+        for missionlet in self.mission_list:
+            yield txros.util.wrap_timeout(missionlet.functor.run(), int(missionlet.timeout))
+        txros.util.wall_sleep(1.0)
 
-        yield txros.util.wall_sleep(1.0)
 
-    #except Exception:
-    #    print traceback.print_exec()
-
+#@txros.util.cancellableInlineCallbacks
+def main(sub_man):
+    try:
+       sub_man.run()
     finally:
+        #end_time = rospy.get_rostime()
         print 'Finished Execution'
         reactor.stop()
 
-def _start():
-    signal.signal(signal.SIGINT, lambda signum, frame: reactor.callFromThread(task.cancel))
-    task = main().addErrback(lambda fail: fail.trap(defer.CancelledError))
-
 if __name__=='__main__':
-    reactor.callWhenRunning(_start)
+    sub_man = Sub8MissionManager()
+    txros.util.wall_sleep(1.0)
+    reactor.callWhenRunning(sub_man._start)
     reactor.run()
