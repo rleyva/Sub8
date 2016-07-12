@@ -102,14 +102,17 @@ class Sub8MissionManager():
         for missionlet in missionlet_list:
             assembled_mission.extend([missionlet, copy.deepcopy(level_off)])
 
-        for i in assembled_mission:
-            print i.name + ' functor addr: ', i.functor.run
+        # Debug
+        #for i in assembled_mission:
+        #    print i.name + ' functor addr: ', i.functor.run
 
         return assembled_mission
 
     def _handle_ex(self, exception):
         # TODO: Handle executions 
-        pass
+        print '------ Exception Traceback ------'
+        print exception.printTraceback()
+        print '---------------------------------'
 
     def _pause(self):
         # Future functionality; will pause defered
@@ -139,14 +142,14 @@ class Sub8MissionManager():
         yield sub.last_pose()
 
         for missionlet in self.mission_list:
-            yield txros.util.wrap_timeout(missionlet.functor.run(), int(missionlet.timeout))
+            yield txros.util.wrap_timeout(missionlet.functor.run(sub).addErrback(self._handle_ex), int(missionlet.timeout))
         txros.util.wall_sleep(1.0)
 
 
-#@txros.util.cancellableInlineCallbacks
+@txros.util.cancellableInlineCallbacks
 def main(sub_man):
     try:
-       sub_man.run()
+       yield sub_man.run()
     finally:
         #end_time = rospy.get_rostime()
         print 'Finished Execution'
@@ -154,6 +157,5 @@ def main(sub_man):
 
 if __name__=='__main__':
     sub_man = Sub8MissionManager()
-    txros.util.wall_sleep(1.0)
     reactor.callWhenRunning(sub_man._start)
     reactor.run()
