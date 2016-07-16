@@ -70,8 +70,9 @@ def main():
 
         yield sub.last_pose()
 
-        for i in range(3):
+        for i in range(1):
             for chore in todo_list:
+                print 'Executing: ', chore.name
                 yield txros.util.wrap_timeout(chore.functor.run(sub), int(chore.timeout))
 
         yield txros.util.wall_sleep(1.0)
