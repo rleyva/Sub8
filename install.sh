@@ -65,9 +65,9 @@ sudo apt-key adv --keyserver hkp://pool.sks-keyservers.net --recv-key 0xB01FA116
 instlog "Installing ROS and Gazebo"
 sudo apt-get update -qq
 if (env | grep --quiet "SUB=true"); then
-    sudo apt-get install -qq ros-indigo-desktop-full
+    sudo apt-get install -qq --yes --force-yes ros-indigo-desktop-full
 else
-    sudo apt-get install -qq ros-indigo-desktop
+    sudo apt-get install -qq --yes --force-yes ros-indigo-desktop
 fi
 sudo apt-get install -qq python-catkin-pkg python-rosdep gazebo7
 
